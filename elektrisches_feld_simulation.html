@@ -1,0 +1,904 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Elektrisches Feld</title>
+  <style>
+    :root {
+      --paper: #f4f7f7;
+      --ink: #192b30;
+      --muted: #52686e;
+      --line: #cedbdd;
+      --positive: #c43c50;
+      --negative: #237da8;
+      --field: #28796a;
+      --potential: #96672a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: linear-gradient(120deg, #f4f7f7, #e8f0ed);
+      font-family: Georgia, "Times New Roman", serif;
+    }
+    button, input, select { font: inherit; }
+    button, select, input { touch-action: manipulation; }
+    button { cursor: pointer; }
+    button:focus-visible, input:focus-visible, select:focus-visible {
+      outline: 3px solid var(--negative);
+      outline-offset: 2px;
+    }
+    [hidden] { display: none !important; }
+    .app {
+      display: grid;
+      grid-template-columns: 256px minmax(0, 1fr) 270px;
+      grid-template-rows: auto minmax(0, 1fr);
+      height: 100vh;
+      height: 100dvh;
+    }
+    header {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 18px;
+      border-bottom: 1px solid var(--line);
+      background: #fff;
+    }
+    h1 { margin: 0; font-size: 1.65rem; line-height: 1.15; letter-spacing: 0; }
+    h2 { margin: 0 0 12px; font-size: 1.05rem; }
+    .legend { display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: .85rem; color: var(--muted); }
+    .legend span { display: inline-flex; align-items: center; gap: 5px; }
+    .dot { width: 14px; height: 14px; border-radius: 50%; }
+    .positive { background: var(--positive); }
+    .negative { background: var(--negative); }
+    .swatch { width: 18px; height: 3px; background: var(--field); }
+    .panel { min-width: 0; min-height: 0; padding: 18px; overflow-y: auto; background: #fff; }
+    .sources { grid-column: 1; grid-row: 2; border-right: 1px solid var(--line); }
+    .probe-panel { grid-column: 3; grid-row: 2; border-left: 1px solid var(--line); }
+    section + section { margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--line); }
+    .controls { display: grid; gap: 10px; }
+    .row { display: flex; justify-content: space-between; align-items: center; gap: 10px; min-height: 44px; }
+    .row > span { min-width: 0; }
+    input[type="number"], select {
+      min-width: 0;
+      width: 110px;
+      min-height: 44px;
+      padding: 7px;
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      color: var(--ink);
+      background: var(--paper);
+    }
+    input[type="range"] { min-width: 0; width: 110px; min-height: 44px; accent-color: var(--field); }
+    input[type="checkbox"] { width: 22px; height: 22px; accent-color: var(--field); }
+    .buttons { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    .btn {
+      min-width: 0;
+      min-height: 44px;
+      padding: 8px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      color: var(--ink);
+      background: var(--paper);
+      line-height: 1.2;
+    }
+    .btn:hover { background: #e4eeed; }
+    .btn.add-positive { background: var(--positive); border-color: var(--positive); color: #fff; }
+    .btn.add-negative { background: var(--negative); border-color: var(--negative); color: #fff; }
+    .btn.primary, .btn.active { background: var(--field); border-color: var(--field); color: #fff; }
+    .btn.warn { color: #aa283c; }
+    .btn[aria-pressed="true"] { outline: 3px solid var(--ink); outline-offset: 2px; }
+    .sign { font-size: 1.3rem; font-weight: bold; }
+    .main {
+      grid-column: 2;
+      grid-row: 2;
+      display: grid;
+      grid-template-rows: minmax(0, 1fr) auto;
+      min-width: 0;
+      min-height: 0;
+      padding: 12px;
+      gap: 8px;
+    }
+    .stage {
+      min-width: 0;
+      min-height: 0;
+      position: relative;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #f9fcfc;
+    }
+    canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
+    .status { min-height: 20px; color: var(--muted); font-size: .85rem; overflow-wrap: anywhere; }
+    .object-menu {
+      position: absolute;
+      z-index: 2;
+      display: grid;
+      gap: 6px;
+      width: 168px;
+      padding: 8px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      box-shadow: 0 6px 24px #192b3026;
+    }
+    .readout { display: grid; gap: 8px; font-size: .9rem; line-height: 1.4; overflow-wrap: anywhere; }
+    .readout span { color: var(--muted); }
+    .speed-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+    .angle-row { display: flex; align-items: center; gap: 10px; }
+    .angle-dial {
+      width: 64px;
+      height: 64px;
+      flex-shrink: 0;
+      border: 1px solid var(--line);
+      border-radius: 50%;
+      background: #e7f1ee;
+      position: relative;
+      touch-action: none;
+    }
+    .angle-dial::before {
+      content: "";
+      position: absolute;
+      left: 50%; top: 50%;
+      width: 24px; height: 3px;
+      background: var(--field);
+      transform-origin: 0 50%;
+      transform: rotate(var(--angle, 0deg));
+    }
+    .tabs { display: none; }
+    @media (max-width: 1000px) {
+      .app { height: auto; min-height: 100dvh; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: auto auto auto auto; }
+      header { grid-row: 1; }
+      .main { grid-column: 1 / -1; grid-row: 2; height: 58dvh; min-height: 300px; padding: 8px; }
+      .tabs { grid-column: 1 / -1; grid-row: 3; display: flex; padding: 0 8px; border-bottom: 1px solid var(--line); background: #fff; }
+      .tabs button { flex: 1; min-height: 46px; border: 0; border-bottom: 3px solid transparent; background: #fff; color: var(--muted); font-size: .9rem; }
+      .tabs button[aria-selected="true"] { border-bottom-color: var(--field); color: var(--ink); font-weight: bold; }
+      .panel { grid-column: 1 / -1; grid-row: 4; overflow: visible; padding: 16px; border: 0; }
+      .panel:not(.mobile-active) { display: none; }
+      .sources { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; }
+      section + section { margin: 0; padding: 0; border: 0; }
+      .probe-panel { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; }
+      .display-section { grid-column: 1 / -1; }
+      .sources[data-view="particles"] .display-section { display: none; }
+      .sources[data-view="display"] .particle-section { display: none; }
+    }
+    @media (max-width: 560px) {
+      header { padding: 10px 12px; flex-wrap: wrap; gap: 8px; }
+      h1 { font-size: 1.4rem; }
+      .legend { font-size: .8rem; gap: 8px 12px; }
+      .main { height: 52dvh; min-height: 280px; }
+      .sources, .probe-panel { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+      .row input[type="range"], .row input[type="number"], .row select { width: 140px; max-width: 50%; }
+    }
+    @media (max-height: 500px) and (max-width: 1000px) {
+      .main { height: 76dvh; min-height: 240px; }
+    }
+    @media (max-width: 1000px) and (orientation: portrait) {
+      body { height: 100dvh; overflow: hidden; }
+      .app { height: 100dvh; min-height: 0; overflow: hidden; grid-template-rows: auto minmax(180px, 52dvh) auto minmax(0, 1fr); }
+      .main { height: auto; min-height: 0; }
+      .status { height: 40px; overflow: hidden; }
+      .panel { min-height: 0; overflow-y: auto; overscroll-behavior-y: contain; align-content: start; scrollbar-gutter: stable; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>Elektrisches Feld</h1>
+      <div class="legend">
+        <span><i class="dot positive"></i>+ Teilchen</span>
+        <span><i class="dot negative"></i>&minus; Teilchen</span>
+        <span><i class="swatch"></i>Elektrisches Feld E</span>
+        <span>1 K&auml;stchen = 1 cm</span>
+      </div>
+    </header>
+    <aside class="panel sources mobile-active" id="sourcesPanel" data-view="particles">
+      <section class="particle-section">
+        <h2>Teilchen</h2>
+        <div class="controls">
+          <label class="row"><span>|Q| (nC)</span><input id="chargeInput" type="number" min="1" max="100" value="20" step="1"></label>
+          <label class="row"><span>Radius R (mm)</span><input id="radiusInput" type="number" min="2" max="12" value="5" step="0.1"></label>
+          <div class="buttons">
+            <button class="btn add-positive" id="addPositive" aria-pressed="false" title="Positives Teilchen setzen"><span class="sign">+</span> Teilchen</button>
+            <button class="btn add-negative" id="addNegative" aria-pressed="false" title="Negatives Teilchen setzen"><span class="sign">&minus;</span> Teilchen</button>
+          </div>
+          <label class="row"><span>Anordnung</span><select id="arrangement">
+            <option value="dipole">Dipol</option>
+            <option value="positive">Einzelnes +</option>
+            <option value="negative">Einzelnes &minus;</option>
+            <option value="like">Zwei positive</option>
+            <option value="quadrupole">Quadrupol</option>
+          </select></label>
+          <button class="btn" id="loadArrangement">Anordnung laden</button>
+          <button class="btn warn" id="clearScene">Alles l&ouml;schen</button>
+        </div>
+      </section>
+      <section class="display-section">
+        <h2>Darstellung</h2>
+        <div class="controls">
+          <label class="row"><span>Feldlinien</span><input id="showLines" type="checkbox" checked></label>
+          <label class="row"><span>Richtungsfeld</span><input id="showArrows" type="checkbox" checked></label>
+          <label class="row"><span>&Auml;quipotentiallinien</span><input id="showPotential" type="checkbox"></label>
+          <label class="row"><span>Potential einf&auml;rben</span><input id="showHeat" type="checkbox"></label>
+          <label class="row"><span>Dichte</span><input id="density" type="range" min="0" max="2" step="1" value="1"></label>
+        </div>
+      </section>
+    </aside>
+    <main class="main">
+      <div class="stage">
+        <canvas id="fieldCanvas" aria-label="Elektrisches Feld mit verschiebbaren Teilchen und Probeladung"></canvas>
+        <div class="object-menu" id="objectMenu" hidden>
+          <button class="btn" data-action="sign">Vorzeichen wechseln</button>
+          <button class="btn warn" data-action="delete">L&ouml;schen</button>
+          <button class="btn" data-action="close">Schlie&szlig;en</button>
+        </div>
+      </div>
+      <div class="status" id="statusText" role="status" aria-live="polite">Bereit</div>
+    </main>
+    <nav class="tabs" role="tablist" aria-label="Einstellungen">
+      <button id="particlesTab" role="tab" aria-selected="true" aria-controls="sourcesPanel" data-tab="particles">Teilchen</button>
+      <button id="displayTab" role="tab" aria-selected="false" aria-controls="sourcesPanel" data-tab="display" tabindex="-1">Darstellung</button>
+      <button id="probeTab" role="tab" aria-selected="false" aria-controls="probePanel" data-tab="probe" tabindex="-1">Probeladung</button>
+    </nav>
+    <aside class="panel probe-panel" id="probePanel">
+      <section>
+        <h2>Probeladung</h2>
+        <button class="btn" id="addProbe" aria-pressed="false" style="width: 100%; margin-bottom: 12px;">Probeladung setzen</button>
+        <div class="readout" id="probeReadout"></div>
+      </section>
+      <section>
+        <div class="controls">
+          <label class="row"><span>Ladung q (pC)</span><select id="probeCharge"><option value="1">+1</option><option value="-1">&minus;1</option></select></label>
+          <label class="row"><span>Starttempo (cm/s)</span><input id="probeSpeed" type="range" min="0" max="4.5" step="0.025" value="0"></label>
+          <div class="row">
+            <span>Richtung</span>
+            <div class="angle-row">
+              <div class="angle-dial" id="angleDial" role="slider" aria-label="Startrichtung" aria-valuemin="0" aria-valuemax="359" aria-valuenow="0" tabindex="0"></div>
+              <span id="angleValue">0&deg;</span>
+            </div>
+          </div>
+          <div class="speed-grid" id="speedControls" aria-label="Simulationstempo">
+            <button class="btn" data-speed="0.5" aria-pressed="false">0,5x</button>
+            <button class="btn active" data-speed="1" aria-pressed="true">1x</button>
+            <button class="btn" data-speed="2" aria-pressed="false">2x</button>
+          </div>
+          <button class="btn primary" id="simulateProbe">Simulation starten</button>
+          <div class="buttons">
+            <button class="btn" id="clearTrail">Spur l&ouml;schen</button>
+            <button class="btn" id="resetProbeStart">Zur&uuml;cksetzen</button>
+          </div>
+        </div>
+      </section>
+    </aside>
+  </div>
+  <script>
+    const canvas = document.getElementById('fieldCanvas');
+    const ctx = canvas.getContext('2d');
+    const stage = canvas.parentElement;
+    const background = document.createElement('canvas');
+    const backgroundCtx = background.getContext('2d');
+    const controls = Object.fromEntries([
+      'chargeInput', 'radiusInput', 'addPositive', 'addNegative', 'addProbe',
+      'arrangement', 'loadArrangement', 'clearScene', 'showLines', 'showArrows',
+      'showPotential', 'showHeat', 'density', 'objectMenu', 'probeCharge',
+      'probeSpeed', 'angleDial', 'angleValue', 'speedControls', 'simulateProbe',
+      'clearTrail', 'resetProbeStart', 'probeReadout', 'statusText'
+    ].map(id => [id, document.getElementById(id)]));
+    const COULOMB_CONSTANT = 8.9875517923e9;
+    const SOURCE_CHARGE_UNIT = 1e-9;
+    const PROBE_CHARGE_UNIT = 1e-12;
+    const PROBE_MASS = 80e-6;
+    const GRID_METERS = 0.01;
+    const FIELD_REFERENCE = 4e5;
+    const colors = { positive: '#c43c50', negative: '#237da8', probe: '#28796a' };
+    let particles = [];
+    let probe = null;
+    let mode = 'select';
+    let selected = null;
+    let contextTarget = null;
+    let drag = null;
+    let anglePointer = null;
+    let probeAngle = 0;
+    let width = 0;
+    let height = 0;
+    let pixelsPerMeter = 3600;
+    let viewWidthMeters = 0;
+    let viewHeightMeters = 0;
+    let pixelScale = 1;
+    let backgroundDirty = true;
+    let drawFrame = 0;
+    let simulationFrame = 0;
+    let running = false;
+    let simulationSpeed = 1;
+    let lastTime = null;
+
+    function clamp(value, min, max) { return Math.max(min, Math.min(max, value)); }
+    function finiteInput(input, min, max, fallback) {
+      const value = Number(input.value);
+      return clamp(Number.isFinite(value) && input.value !== '' ? value : fallback, min, max);
+    }
+    function requestDraw(fieldChanged = false) {
+      backgroundDirty ||= fieldChanged;
+      if (!drawFrame) drawFrame = requestAnimationFrame(() => { drawFrame = 0; draw(); });
+    }
+    function resizeCanvas() {
+      const nextWidth = canvas.clientWidth;
+      const nextHeight = canvas.clientHeight;
+      if (!nextWidth || !nextHeight) return;
+      if (!viewWidthMeters) {
+        viewWidthMeters = nextWidth / pixelsPerMeter;
+        viewHeightMeters = nextHeight / pixelsPerMeter;
+      }
+      const nextPixelsPerMeter = Math.min(nextWidth / viewWidthMeters, nextHeight / viewHeightMeters);
+      if (width && height && (width !== nextWidth || height !== nextHeight)) {
+        stopSimulation();
+        const scale = nextPixelsPerMeter / pixelsPerMeter;
+        const projectX = x => nextWidth / 2 + (x - width / 2) * scale;
+        const projectY = y => nextHeight / 2 + (y - height / 2) * scale;
+        for (const item of [...particles, ...(probe ? [probe] : [])]) {
+          item.x = projectX(item.x);
+          item.y = projectY(item.y);
+          if (item.radius) item.radius *= scale;
+        }
+        if (probe) {
+          probe.startX = projectX(probe.startX);
+          probe.startY = projectY(probe.startY);
+          probe.vx *= scale;
+          probe.vy *= scale;
+          probe.startVx *= scale;
+          probe.startVy *= scale;
+          for (const point of probe.trail) {
+            point.x = projectX(point.x);
+            point.y = projectY(point.y);
+          }
+        }
+        hideObjectMenu();
+      }
+      pixelsPerMeter = nextPixelsPerMeter;
+      width = nextWidth;
+      height = nextHeight;
+      pixelScale = Math.min(window.devicePixelRatio || 1, 2);
+      for (const surface of [canvas, background]) {
+        surface.width = Math.round(width * pixelScale);
+        surface.height = Math.round(height * pixelScale);
+      }
+      ctx.setTransform(pixelScale, 0, 0, pixelScale, 0, 0);
+      backgroundCtx.setTransform(pixelScale, 0, 0, pixelScale, 0, 0);
+      backgroundDirty = true;
+      draw();
+    }
+    function fieldAt(x, y) {
+      let ex = 0;
+      let ey = 0;
+      let potential = 0;
+      for (const source of particles) {
+        const dx = (x - source.x) / pixelsPerMeter;
+        const dy = (y - source.y) / pixelsPerMeter;
+        const radiusSquared = dx * dx + dy * dy;
+        const radius = Math.sqrt(radiusSquared);
+        const sourceRadius = source.radius / pixelsPerMeter;
+        const effectiveRadius = Math.max(radius, sourceRadius);
+        const factor = COULOMB_CONSTANT * source.charge / effectiveRadius ** 3;
+        ex += factor * dx;
+        ey += factor * dy;
+        potential += radius >= sourceRadius ? COULOMB_CONSTANT * source.charge / radius :
+          COULOMB_CONSTANT * source.charge * (3 * sourceRadius ** 2 - radiusSquared) / (2 * sourceRadius ** 3);
+      }
+      return { ex, ey, magnitude: Math.hypot(ex, ey), potential };
+    }
+    function addParticleAt(x, y, sign, magnitude = finiteInput(controls.chargeInput, 1, 100, 20)) {
+      particles.push({ x, y, charge: sign * magnitude * SOURCE_CHARGE_UNIT,
+        radius: finiteInput(controls.radiusInput, 2, 12, 5) * 1e-3 * pixelsPerMeter });
+      requestDraw(true);
+    }
+    function velocityFromControls() {
+      const speed = Number(controls.probeSpeed.value) * 0.01 * pixelsPerMeter;
+      const angle = probeAngle * Math.PI / 180;
+      return { vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed };
+    }
+    function setProbeAt(x, y) {
+      stopSimulation();
+      const velocity = velocityFromControls();
+      probe = { x, y, ...velocity, charge: Number(controls.probeCharge.value) * PROBE_CHARGE_UNIT, startX: x, startY: y,
+        startVx: velocity.vx, startVy: velocity.vy, trail: [] };
+      requestDraw();
+    }
+    function setMode(nextMode) {
+      mode = nextMode;
+      for (const [button, buttonMode] of [[controls.addPositive, 'positive'], [controls.addNegative, 'negative'], [controls.addProbe, 'probe']]) {
+        button.setAttribute('aria-pressed', String(mode === buttonMode));
+      }
+      controls.statusText.textContent = mode === 'select' ? `${particles.length} Teilchen` :
+        mode === 'probe' ? 'Position der Probeladung w\u00e4hlen' : 'Position des Teilchens w\u00e4hlen';
+      hideObjectMenu();
+      if (mode !== 'select' && window.matchMedia('(max-width: 1000px) and (orientation: landscape)').matches) {
+        stage.scrollIntoView({ block: 'start' });
+      }
+    }
+    function drawArrow(context, x, y, angle, length, head = 5) {
+      const endX = x + Math.cos(angle) * length;
+      const endY = y + Math.sin(angle) * length;
+      context.beginPath();
+      context.moveTo(x, y);
+      context.lineTo(endX, endY);
+      context.stroke();
+      context.beginPath();
+      context.moveTo(endX, endY);
+      context.lineTo(endX - Math.cos(angle - .5) * head, endY - Math.sin(angle - .5) * head);
+      context.lineTo(endX - Math.cos(angle + .5) * head, endY - Math.sin(angle + .5) * head);
+      context.closePath();
+      context.fill();
+    }
+    function drawBackground() {
+      const context = backgroundCtx;
+      context.clearRect(0, 0, width, height);
+      if (controls.showHeat.checked) {
+        for (let y = 0; y < height; y += 12) {
+          for (let x = 0; x < width; x += 12) {
+            const value = fieldAt(x + 6, y + 6).potential;
+            const depth = Math.min(.75, Math.abs(value) / 60000);
+            context.fillStyle = value >= 0 ? `rgba(196,60,80,${depth})` : `rgba(35,125,168,${depth})`;
+            context.fillRect(x, y, 12, 12);
+          }
+        }
+      }
+      context.strokeStyle = '#192b3012';
+      context.lineWidth = 1;
+      context.beginPath();
+      const spacing = GRID_METERS * pixelsPerMeter;
+      const originX = width / 2 - viewWidthMeters * pixelsPerMeter / 2;
+      const originY = height / 2 - viewHeightMeters * pixelsPerMeter / 2;
+      const firstX = (originX % spacing + spacing) % spacing;
+      const firstY = (originY % spacing + spacing) % spacing;
+      for (let x = firstX; x < width; x += spacing) { context.moveTo(x, 0); context.lineTo(x, height); }
+      for (let y = firstY; y < height; y += spacing) { context.moveTo(0, y); context.lineTo(width, y); }
+      context.stroke();
+      if (controls.showPotential.checked) drawEquipotentialLines();
+      if (controls.showArrows.checked) drawDirectionField();
+      if (controls.showLines.checked) drawFieldLines();
+      backgroundDirty = false;
+    }
+    function drawDirectionField() {
+      const spacing = [64, 44, 30][Number(controls.density.value)];
+      backgroundCtx.strokeStyle = '#28796a88';
+      backgroundCtx.fillStyle = '#28796a88';
+      backgroundCtx.lineWidth = 1.3;
+      for (let y = spacing / 2; y < height; y += spacing) {
+        for (let x = spacing / 2; x < width; x += spacing) {
+          if (insideParticle(x, y)) continue;
+          const field = fieldAt(x, y);
+          if (field.magnitude < 1e-7) continue;
+          const length = Math.min(spacing * .65, 5 + 24 * Math.pow(Math.min(1, field.magnitude / FIELD_REFERENCE), .42));
+          drawArrow(backgroundCtx, x, y, Math.atan2(field.ey, field.ex), length);
+        }
+      }
+    }
+    function insideParticle(x, y) {
+      return particles.find(source => Math.hypot(x - source.x, y - source.y) <= source.radius + 1);
+    }
+    function traceFieldLine(source, angle) {
+      const direction = Math.sign(source.charge);
+      let x = source.x + Math.cos(angle) * (source.radius + 3);
+      let y = source.y + Math.sin(angle) * (source.radius + 3);
+      const points = [{ x, y }];
+      let endpoint = null;
+      for (let step = 0; step < 700; step += 1) {
+        const field = fieldAt(x, y);
+        if (field.magnitude < 1e-7) break;
+        const mid = fieldAt(x + direction * field.ex / field.magnitude * 2, y + direction * field.ey / field.magnitude * 2);
+        if (mid.magnitude < 1e-7) break;
+        x += direction * mid.ex / mid.magnitude * 4;
+        y += direction * mid.ey / mid.magnitude * 4;
+        points.push({ x, y });
+        endpoint = insideParticle(x, y);
+        if (endpoint || x < -8 || y < -8 || x > width + 8 || y > height + 8) break;
+      }
+      if (direction < 0 && endpoint && endpoint.charge > 0) return;
+      backgroundCtx.beginPath();
+      backgroundCtx.moveTo(points[0].x, points[0].y);
+      for (const point of points) backgroundCtx.lineTo(point.x, point.y);
+      backgroundCtx.stroke();
+      drawFieldLineArrows(points, direction, endpoint && endpoint.charge * source.charge < 0);
+    }
+    function drawFieldLineArrows(points, direction, connected) {
+      const lengths = [0];
+      for (let index = 1; index < points.length; index += 1) {
+        lengths.push(lengths[index - 1] + Math.hypot(points[index].x - points[index - 1].x, points[index].y - points[index - 1].y));
+      }
+      const totalLength = lengths[lengths.length - 1];
+      const poleOffset = 40 / 3600 * pixelsPerMeter;
+      const distances = connected ? [poleOffset, totalLength / 2, totalLength - poleOffset] : [poleOffset];
+      for (const distance of distances) {
+        if (distance <= 0 || distance >= totalLength) continue;
+        const index = lengths.findIndex(length => length >= distance);
+        const point = points[index - 1];
+        const next = points[index];
+        const fraction = (distance - lengths[index - 1]) / (lengths[index] - lengths[index - 1]);
+        const arrowAngle = Math.atan2(direction * (next.y - point.y), direction * (next.x - point.x));
+        const tipX = point.x + fraction * (next.x - point.x);
+        const tipY = point.y + fraction * (next.y - point.y);
+        drawArrow(backgroundCtx, tipX - Math.cos(arrowAngle) * 3, tipY - Math.sin(arrowAngle) * 3, arrowAngle, 3, 6);
+      }
+    }
+    function drawFieldLines() {
+      backgroundCtx.strokeStyle = '#28796aaa';
+      backgroundCtx.fillStyle = '#28796a';
+      backgroundCtx.lineWidth = 1.2;
+      const baseCount = [8, 14, 22][Number(controls.density.value)];
+      for (const source of particles) {
+        const count = clamp(Math.round(baseCount * Math.abs(source.charge) / (20 * SOURCE_CHARGE_UNIT)), 4, 100);
+        for (let index = 0; index < count; index += 1) traceFieldLine(source, 2 * Math.PI * index / count);
+      }
+    }
+    function drawEquipotentialLines() {
+      if (!particles.length) return;
+      const step = [30, 24, 18][Number(controls.density.value)];
+      const columns = Math.ceil(width / step);
+      const rows = Math.ceil(height / step);
+      const samples = Array.from({ length: rows + 1 }, (_, row) =>
+        Array.from({ length: columns + 1 }, (_, column) => fieldAt(column * step, row * step).potential));
+      const levels = [-30000, -15000, -7500, -3000, -1500, 0, 1500, 3000, 7500, 15000, 30000];
+      backgroundCtx.strokeStyle = '#96672aaa';
+      backgroundCtx.lineWidth = 1.2;
+      for (const level of levels) {
+        backgroundCtx.beginPath();
+        for (let row = 0; row < rows; row += 1) {
+          for (let column = 0; column < columns; column += 1) {
+            const corners = [
+              { x: column * step, y: row * step, value: samples[row][column] },
+              { x: (column + 1) * step, y: row * step, value: samples[row][column + 1] },
+              { x: (column + 1) * step, y: (row + 1) * step, value: samples[row + 1][column + 1] },
+              { x: column * step, y: (row + 1) * step, value: samples[row + 1][column] }
+            ];
+            const crossings = [];
+            for (let edge = 0; edge < 4; edge += 1) {
+              const first = corners[edge];
+              const second = corners[(edge + 1) % 4];
+              if ((first.value > level) === (second.value > level)) continue;
+              const fraction = (level - first.value) / (second.value - first.value);
+              crossings.push({ x: first.x + fraction * (second.x - first.x), y: first.y + fraction * (second.y - first.y) });
+            }
+            for (let index = 0; index + 1 < crossings.length; index += 2) {
+              backgroundCtx.moveTo(crossings[index].x, crossings[index].y);
+              backgroundCtx.lineTo(crossings[index + 1].x, crossings[index + 1].y);
+            }
+          }
+        }
+        backgroundCtx.stroke();
+      }
+    }
+    function draw() {
+      if (!width || !height) return;
+      if (backgroundDirty) drawBackground();
+      ctx.clearRect(0, 0, width, height);
+      ctx.drawImage(background, 0, 0, width, height);
+      if (probe && probe.trail.length > 1) {
+        ctx.strokeStyle = '#28796a99';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(probe.trail[0].x, probe.trail[0].y);
+        for (const point of probe.trail) ctx.lineTo(point.x, point.y);
+        ctx.stroke();
+      }
+      for (const particle of particles) {
+        ctx.fillStyle = particle.charge > 0 ? colors.positive : colors.negative;
+        ctx.beginPath();
+        ctx.arc(particle.x, particle.y, particle.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = selected === particle ? '#192b30' : '#ffffff';
+        ctx.lineWidth = selected === particle ? 3 : 1.5;
+        ctx.stroke();
+        ctx.fillStyle = '#fff';
+        ctx.font = `bold ${Math.min(22, particle.radius * 1.3)}px Georgia, serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(particle.charge > 0 ? '+' : '\u2212', particle.x, particle.y);
+        ctx.fillStyle = '#192b30';
+        ctx.font = '12px Georgia, serif';
+        ctx.fillText(`Q = ${particle.charge > 0 ? '+' : ''}${(particle.charge / SOURCE_CHARGE_UNIT).toFixed(0)} nC`, clamp(particle.x, 52, width - 52),
+          particle.y + particle.radius + 16 < height - 8 ? particle.y + particle.radius + 16 : particle.y - particle.radius - 14);
+      }
+      if (probe) {
+        const field = fieldAt(probe.x, probe.y);
+        ctx.strokeStyle = colors.probe;
+        ctx.fillStyle = colors.probe;
+        ctx.lineWidth = 3;
+        if (field.magnitude > 1e-7) drawArrow(ctx, probe.x, probe.y,
+          Math.atan2(field.ey * probe.charge, field.ex * probe.charge), Math.min(76, 16 + field.magnitude / FIELD_REFERENCE * 36), 8);
+        const speed = Math.hypot(probe.vx, probe.vy);
+        ctx.strokeStyle = '#96672a';
+        ctx.fillStyle = '#96672a';
+        if (speed > 1) drawArrow(ctx, probe.x, probe.y, Math.atan2(probe.vy, probe.vx), Math.min(54, speed * .3), 7);
+        ctx.beginPath();
+        ctx.arc(probe.x, probe.y, 12, 0, 2 * Math.PI);
+        ctx.fillStyle = '#fff';
+        ctx.fill();
+        ctx.strokeStyle = colors.probe;
+        ctx.stroke();
+        ctx.fillStyle = colors.probe;
+        ctx.font = 'bold 17px Georgia, serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(probe.charge > 0 ? '+' : '\u2212', probe.x, probe.y);
+      }
+      updateReadout();
+    }
+    function updateReadout() {
+      if (!probe) { controls.probeReadout.innerHTML = '<strong>Keine Probeladung gesetzt</strong>'; return; }
+      const field = fieldAt(probe.x, probe.y);
+      const format = value => Math.abs(value) < 1e-12 ? '0' : Math.abs(value) < .001 ?
+        value.toExponential(2).replace('.', ',') : value.toLocaleString('de-DE', { maximumFractionDigits: 3 });
+      const nearestDistance = particles.length ? Math.min(...particles.map(source => Math.hypot(probe.x - source.x, probe.y - source.y))) : null;
+      controls.probeReadout.innerHTML = `<strong>|E| = ${format(field.magnitude / 1e3)} kN/C</strong>
+        <span>Potential: ${format(field.potential / 1e3)} kV</span>
+        <span>q = ${probe.charge > 0 ? '+1' : '\u22121'} pC; m = 80 mg</span>
+        <span>|F| = ${format(Math.abs(probe.charge) * field.magnitude / 1e-6)} \u00b5N; F = q E</span>
+        <span>Tempo: ${format(Math.hypot(probe.vx, probe.vy) / pixelsPerMeter * 100)} cm/s</span>
+        <span>${nearestDistance === null ? 'Kein Quellteilchen' : `Abstand r: ${format(nearestDistance / pixelsPerMeter * 100)} cm (Mitte\u2013Mitte)`}</span>`;
+    }
+    function pointerPosition(event) {
+      const rect = canvas.getBoundingClientRect();
+      return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+    }
+    function hitTest(x, y) {
+      if (probe && Math.hypot(probe.x - x, probe.y - y) <= 24) return probe;
+      return [...particles].reverse().find(particle => Math.hypot(particle.x - x, particle.y - y) <= Math.max(24, particle.radius + 6));
+    }
+    function hideObjectMenu() { controls.objectMenu.hidden = true; contextTarget = null; }
+    function showObjectMenu(target, x, y) {
+      contextTarget = target;
+      controls.objectMenu.style.left = `${clamp(x, 4, width - 176)}px`;
+      controls.objectMenu.style.top = `${clamp(y, 4, height - 164)}px`;
+      controls.objectMenu.hidden = false;
+    }
+    function deleteObject(target) {
+      if (!target) return;
+      stopSimulation();
+      if (target === probe) probe = null;
+      else particles = particles.filter(particle => particle !== target);
+      selected = null;
+      hideObjectMenu();
+      setMode('select');
+      requestDraw(true);
+    }
+    function flipCharge(target) {
+      if (!target) return;
+      stopSimulation();
+      target.charge *= -1;
+      if (target === probe) controls.probeCharge.value = String(Math.sign(probe.charge));
+      requestDraw(true);
+    }
+    canvas.addEventListener('pointerdown', event => {
+      if (event.button !== 0 && event.button !== 2) return;
+      if (drag) return;
+      const pos = pointerPosition(event);
+      const hit = hitTest(pos.x, pos.y);
+      if (event.button === 2) { if (hit) showObjectMenu(hit, pos.x, pos.y); return; }
+      hideObjectMenu();
+      stopSimulation();
+      if (mode !== 'select') {
+        if (mode === 'probe') setProbeAt(pos.x, pos.y);
+        else addParticleAt(pos.x, pos.y, mode === 'positive' ? 1 : -1);
+        setMode('select');
+        return;
+      }
+      selected = hit || null;
+      if (hit) {
+        drag = { pointerId: event.pointerId, target: hit, offsetX: hit.x - pos.x, offsetY: hit.y - pos.y,
+          startX: pos.x, startY: pos.y, moved: false };
+        canvas.setPointerCapture(event.pointerId);
+      }
+      requestDraw();
+    });
+    canvas.addEventListener('pointermove', event => {
+      if (!drag || event.pointerId !== drag.pointerId) return;
+      const pos = pointerPosition(event);
+      if (Math.hypot(pos.x - drag.startX, pos.y - drag.startY) > 5) drag.moved = true;
+      if (!drag.moved) return;
+      const margin = drag.target === probe ? 14 : drag.target.radius + 2;
+      drag.target.x = clamp(pos.x + drag.offsetX, margin, width - margin);
+      drag.target.y = clamp(pos.y + drag.offsetY, margin, height - margin);
+      requestDraw(drag.target !== probe);
+    });
+    function endDrag(event) {
+      if (!drag || drag.pointerId !== event.pointerId) return;
+      const target = drag.target;
+      if (drag.moved && target === probe) {
+        probe.startX = probe.x;
+        probe.startY = probe.y;
+        probe.trail = [];
+      }
+      if (!drag.moved && event.type === 'pointerup') showObjectMenu(target, target.x + 16, target.y + 16);
+      drag = null;
+      requestDraw();
+    }
+    canvas.addEventListener('pointerup', endDrag);
+    canvas.addEventListener('pointercancel', endDrag);
+    canvas.addEventListener('lostpointercapture', endDrag);
+    canvas.addEventListener('contextmenu', event => {
+      event.preventDefault();
+      const pos = pointerPosition(event);
+      const hit = hitTest(pos.x, pos.y);
+      if (hit) showObjectMenu(hit, pos.x, pos.y);
+    });
+    controls.objectMenu.addEventListener('click', event => {
+      const action = event.target.closest('[data-action]')?.dataset.action;
+      if (action === 'delete') deleteObject(contextTarget);
+      if (action === 'sign') flipCharge(contextTarget);
+      hideObjectMenu();
+    });
+    document.addEventListener('pointerdown', event => {
+      if (!stage.contains(event.target)) hideObjectMenu();
+    });
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape') { setMode('select'); selected = null; requestDraw(); }
+      if (event.key === 'Delete' && !event.target.matches('input, select, textarea')) deleteObject(selected);
+    });
+    function setAngle(angle) {
+      probeAngle = Math.round((angle % 360 + 360) % 360);
+      controls.angleValue.textContent = `${probeAngle}\u00b0`;
+      controls.angleDial.style.setProperty('--angle', `${probeAngle}deg`);
+      controls.angleDial.setAttribute('aria-valuenow', String(probeAngle));
+      applyVelocity();
+    }
+    function angleFromPointer(event) {
+      const rect = controls.angleDial.getBoundingClientRect();
+      setAngle(Math.atan2(event.clientY - rect.top - rect.height / 2, event.clientX - rect.left - rect.width / 2) * 180 / Math.PI);
+    }
+    function applyVelocity() {
+      if (!probe || running) return;
+      Object.assign(probe, velocityFromControls());
+      probe.startVx = probe.vx;
+      probe.startVy = probe.vy;
+      requestDraw();
+    }
+    controls.angleDial.addEventListener('pointerdown', event => {
+      anglePointer = event.pointerId;
+      controls.angleDial.setPointerCapture(event.pointerId);
+      angleFromPointer(event);
+    });
+    controls.angleDial.addEventListener('pointermove', event => { if (event.pointerId === anglePointer) angleFromPointer(event); });
+    for (const eventName of ['pointerup', 'pointercancel', 'lostpointercapture']) {
+      controls.angleDial.addEventListener(eventName, () => { anglePointer = null; });
+    }
+    controls.angleDial.addEventListener('keydown', event => {
+      if (!['ArrowRight', 'ArrowUp', 'ArrowLeft', 'ArrowDown'].includes(event.key)) return;
+      event.preventDefault();
+      setAngle(probeAngle + (['ArrowRight', 'ArrowUp'].includes(event.key) ? 5 : -5));
+    });
+    function stopSimulation() {
+      running = false;
+      cancelAnimationFrame(simulationFrame);
+      simulationFrame = 0;
+      controls.simulateProbe.textContent = 'Simulation starten';
+      controls.simulateProbe.classList.remove('active');
+    }
+    function advanceProbe(dt) {
+      const before = fieldAt(probe.x, probe.y);
+      const accelerationScale = probe.charge / PROBE_MASS * pixelsPerMeter;
+      probe.x += (probe.vx + accelerationScale * before.ex * dt / 2) * dt;
+      probe.y += (probe.vy + accelerationScale * before.ey * dt / 2) * dt;
+      const after = fieldAt(probe.x, probe.y);
+      probe.vx += accelerationScale * (before.ex + after.ex) * dt / 2;
+      probe.vy += accelerationScale * (before.ey + after.ey) * dt / 2;
+      if (insideParticle(probe.x, probe.y) || probe.x < -width || probe.y < -height || probe.x > width * 2 || probe.y > height * 2) {
+        stopSimulation();
+        controls.statusText.textContent = insideParticle(probe.x, probe.y) ? 'Probeladung trifft Teilchen.' : 'Probeladung verl\u00e4sst den Simulationsbereich.';
+      }
+    }
+    function stepSimulation(timestamp) {
+      simulationFrame = 0;
+      if (!running || !probe) return;
+      let remaining = lastTime === null ? 0 : Math.min(.05, (timestamp - lastTime) / 1000) * simulationSpeed;
+      lastTime = timestamp;
+      while (remaining > 0 && running) {
+        const dt = Math.min(1 / 180, remaining);
+        advanceProbe(dt);
+        remaining -= dt;
+      }
+      probe.trail.push({ x: probe.x, y: probe.y });
+      if (probe.trail.length > 900) probe.trail.shift();
+      requestDraw();
+      if (running) simulationFrame = requestAnimationFrame(stepSimulation);
+    }
+    controls.simulateProbe.addEventListener('click', () => {
+      if (running) { stopSimulation(); return; }
+      if (!probe) { controls.statusText.textContent = 'Zuerst eine Probeladung setzen.'; return; }
+      if (insideParticle(probe.x, probe.y)) { controls.statusText.textContent = 'Probeladung liegt in einem Teilchen.'; return; }
+      running = true;
+      lastTime = null;
+      controls.simulateProbe.textContent = 'Pause';
+      controls.simulateProbe.classList.add('active');
+      simulationFrame = requestAnimationFrame(stepSimulation);
+    });
+    controls.resetProbeStart.addEventListener('click', () => {
+      if (!probe) return;
+      stopSimulation();
+      Object.assign(probe, { x: probe.startX, y: probe.startY, vx: probe.startVx, vy: probe.startVy, trail: [] });
+      requestDraw();
+    });
+    controls.clearTrail.addEventListener('click', () => { if (probe) probe.trail = []; requestDraw(); });
+    controls.probeSpeed.addEventListener('input', applyVelocity);
+    controls.probeCharge.addEventListener('change', () => {
+      stopSimulation();
+      if (probe) probe.charge = Number(controls.probeCharge.value) * PROBE_CHARGE_UNIT;
+      requestDraw();
+    });
+    controls.speedControls.addEventListener('click', event => {
+      const button = event.target.closest('[data-speed]');
+      if (!button) return;
+      simulationSpeed = Number(button.dataset.speed);
+      for (const item of controls.speedControls.children) {
+        item.classList.toggle('active', item === button);
+        item.setAttribute('aria-pressed', String(item === button));
+      }
+    });
+    controls.addPositive.addEventListener('click', () => setMode(mode === 'positive' ? 'select' : 'positive'));
+    controls.addNegative.addEventListener('click', () => setMode(mode === 'negative' ? 'select' : 'negative'));
+    controls.addProbe.addEventListener('click', () => setMode(mode === 'probe' ? 'select' : 'probe'));
+    controls.clearScene.addEventListener('click', () => {
+      stopSimulation();
+      particles = [];
+      probe = null;
+      selected = null;
+      setMode('select');
+      requestDraw(true);
+    });
+    function loadArrangement() {
+      stopSimulation();
+      particles = [];
+      probe = null;
+      selected = null;
+      const name = controls.arrangement.value;
+      if (name === 'positive' || name === 'negative') addParticleAt(width * .5, height * .5, name === 'positive' ? 1 : -1, 20);
+      else if (name === 'quadrupole') {
+        for (const [fractionX, fractionY, sign] of [[.3, .3, 1], [.7, .3, -1], [.3, .7, -1], [.7, .7, 1]]) {
+          addParticleAt(width * fractionX, height * fractionY, sign, 20);
+        }
+      } else {
+        addParticleAt(width * .3, height * .55, 1, 20);
+        addParticleAt(width * .7, height * .55, name === 'like' ? 1 : -1, 20);
+      }
+      controls.probeSpeed.value = '0';
+      setAngle(0);
+      setProbeAt(width * .5, height * .22);
+      setMode('select');
+      requestDraw(true);
+    }
+    controls.loadArrangement.addEventListener('click', loadArrangement);
+    for (const control of [controls.showLines, controls.showArrows, controls.showPotential, controls.showHeat, controls.density]) {
+      control.addEventListener('input', () => requestDraw(true));
+    }
+    const tabs = [...document.querySelectorAll('[data-tab]')];
+    function activateTab(tab) {
+      for (const button of tabs) {
+        button.setAttribute('aria-selected', String(button === tab));
+        button.tabIndex = button === tab ? 0 : -1;
+      }
+      document.getElementById('sourcesPanel').dataset.view = tab.dataset.tab;
+      document.getElementById('sourcesPanel').classList.toggle('mobile-active', tab.dataset.tab !== 'probe');
+      document.getElementById('probePanel').classList.toggle('mobile-active', tab.dataset.tab === 'probe');
+    }
+    for (const tab of tabs) {
+      tab.addEventListener('click', () => activateTab(tab));
+      tab.addEventListener('keydown', event => {
+        if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+        event.preventDefault();
+        const index = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 :
+          (tabs.indexOf(tab) + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
+        activateTab(tabs[index]);
+        tabs[index].focus();
+      });
+    }
+    document.addEventListener('visibilitychange', () => { if (document.hidden) stopSimulation(); });
+    new ResizeObserver(resizeCanvas).observe(stage);
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+    loadArrangement();
+  </script>
+</body>
+</html>
